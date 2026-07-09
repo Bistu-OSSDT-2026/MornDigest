@@ -8,6 +8,7 @@ news_api.py — 新闻数据获取模块
 """
 
 import logging
+import requests
 from typing import Optional
 
 from config.settings import settings
@@ -90,59 +91,101 @@ def _fetch_category_news(api_key: str, category: str, limit: int) -> list:
     Returns:
         NewsItem 列表
     """
-    # TODO: 芦泓天 — 实现新闻 API 请求
-    # 根据实际使用的新闻 API 填写以下代码
-    # 步骤：
-    #   1. import requests
-    #   2. resp = requests.get(新闻接口URL, params={"key": api_key, "category": category, "limit": limit}, timeout=API_TIMEOUT)
-    #   3. resp.raise_for_status()
-    #   4. data = resp.json()
-    #   5. 遍历 data 中的文章，封装为 NewsItem 对象
+    
 
-    # 示例伪代码：
-    # import requests
-    # resp = requests.get(
-    #     "https://example-news-api.com/articles",
-    #     params={
-    #         "key": api_key,
-    #         "category": _map_category(category),
-    #         "limit": limit,
-    #     },
-    #     timeout=API_TIMEOUT,
-    # )
-    # resp.raise_for_status()
-    # articles = resp.json().get("articles", [])
-    # items = []
-    # for article in articles:
-    #     items.append(NewsItem(
-    #         title=article.get("title", ""),
-    #         summary=article.get("description", ""),
-    #         source=article.get("source", ""),
-    #         category=category,
-    #         url=article.get("url", ""),
-    #         publish_time=article.get("publishedAt", ""),
-    #     ))
-    # return items
+    url = "http://v.juhe.cn/toutiao/index"
 
-    raise NewsAPIError("新闻 API 接口待实现")
+    params = {
+        "key": api_key,
+        "type": _map_category(category)
+        
+    }
+
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            timeout=API_TIMEOUT
+        )
+
+        response.raise_for_status()
+
+        data = response.json()
+
+
+        if data.get("error_code", 0) != 0:
+            raise NewsAPIError(
+                f"新闻接口返回错误: {data}"
+            )
+
+
+        articles = data.get(
+            "result",
+            {}
+        ).get(
+            "data",
+            []
+        )
+
+
+        items = []
+
+
+        for article in articles[:limit]:
+
+            items.append(
+                NewsItem(
+                    title=article.get(
+                        "title",
+                        ""
+                    ),
+
+                    summary=article.get(
+                        "digest",
+                        ""
+                    ),
+
+                    source=article.get(
+                        "author_name",
+                        ""
+                    ),
+
+                    category=category,
+
+                    url=article.get(
+                        "url",
+                        ""
+                    ),
+
+                    publish_time=article.get(
+                        "date",
+                        ""
+                    )
+                )
+            )
+
+
+        return items
+
+
+    except Exception as e:
+
+        raise NewsAPIError(
+            f"新闻请求异常: {e}"
+        )
 
 
 def _map_category(category: str) -> str:
-    """将中文分类映射为 API 所需的分类标识
+    """新闻分类映射"""
 
-    Args:
-        category: 中文分类名
+    category_map = {
+    "科技": "keji",
+    "财经": "caijing",
+    "体育": "tiyu",
+    "综合": "top", 
+    }
 
-    Returns:
-        API 所需的分类字符串
-    """
-    # TODO: 芦泓天 — 根据实际 API 文档填写映射规则
-    # 示例：
-    # category_map = {
-    #     "科技": "technology",
-    #     "财经": "business",
-    #     "体育": "sports",
-    #     "综合": "general",
-    # }
-    # return category_map.get(category, "general")
-    return category
+    return category_map.get(
+        category,
+         "top"
+    )
