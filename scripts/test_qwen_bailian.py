@@ -54,21 +54,21 @@ def main():
     try:
         brief = QwenBot().generate_brief(weather, news)
     except Exception as e:
-        print(f"❌ 调用失败: {e}")
+        print(f"[X] 调用失败: {e}")
         sys.exit(1)
 
     print("=" * 60)
-    print(f"📅 {brief.date}    🏙️ {brief.city}    🤖 {brief.model_used}")
+    print(f"[日期] {brief.date}    [城市] {brief.city}    [模型] {brief.model_used}")
     print("=" * 60)
     print()
-    print("【☀️ 天气摘要】")
+    print("【天气摘要】")
     print(brief.weather_summary)
     print()
-    print("【📰 简报正文】")
+    print("【简报正文】")
     print(brief.digest)
     print()
-    print(f"【📊 字数统计】{brief.word_count()} 字")
-    print(f"【⏰ 生成时间】{brief.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"【字数统计】{brief.word_count()} 字")
+    print(f"【生成时间】{brief.created_at.strftime('%Y-%m-%d %H:%M:%S')}")
 
 
 if __name__ == "__main__":
