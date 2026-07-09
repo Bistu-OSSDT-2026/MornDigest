@@ -955,7 +955,7 @@ streamlit run run.py
 - [ ] 前端界面完善 (芦泓天)
 - [ ] 天气 API 实现 (芦泓天) — 参考和风天气文档
 - [ ] 新闻 API 实现 (芦泓天) — 确定新闻源
-- [x] **AI 模型接入 (刘志杰) ✅ 已完成** — DeepSeek/智谱/通义三家 SDK 接入 + 异常分类 + 懒加载 + 31 个单元测试 + `scripts/test_qwen_bailian.py` 真机验证脚本
+- [ ] **AI 模型接入 (刘志杰) — DeepSeek/智谱/通义三家 SDK 接入 + 异常分类 + 懒加载 + 31 个单元测试 + `scripts/test_qwen_bailian.py` 真机验证脚本
 - [ ] 存储模块完善 (崔锦崧) — 框架已完成，可按需优化
 
 ### Phase 3: 集成测试
