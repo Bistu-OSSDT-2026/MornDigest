@@ -21,6 +21,13 @@ from config.settings import settings
 logger = logging.getLogger(__name__)
 
 _QWEN_MODEL = "qwen-plus"
+# 备选模型名（百炼平台兼容）：
+#   - "qwen-turbo"   更快，便宜
+#   - "qwen-plus"    综合强，默认
+#   - "qwen-max"     最强
+#   - "qwen-long"    超长上下文（适合大量新闻）
+#   - "glm-5.1"      智谱 GLM 系列（百炼提供）
+# 修改本常量后无需改其他代码。
 
 # 与 DeepSeek / 智谱共用的段落切分规则
 _SECTION_SPLIT_RE = re.compile(
