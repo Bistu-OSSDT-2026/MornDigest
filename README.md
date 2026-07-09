@@ -1,4 +1,5 @@
 # MornDigest
+<<<<<<< HEAD
 
 > AI晨间智能简报工具 — 自动化信息聚合，个性化晨间简报
 
@@ -118,3 +119,6 @@ MornDigest/
 ## 📜 开源协议
 
 MIT License — 详见 [LICENSE](LICENSE)
+=======
+Team-35
+>>>>>>> bd4c19a73bc143458c0ea14209b44382f309dff2
