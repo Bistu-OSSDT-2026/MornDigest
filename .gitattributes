@@ -1,0 +1,6 @@
+# 所有文本文件统一使用 LF 换行符
+* text=auto eol=lf
+
+# 明确指定 Markdown 和文档文件使用 LF
+*.md text eol=lf
+*.txt text eol=lf
