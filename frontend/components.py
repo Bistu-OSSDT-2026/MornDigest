@@ -1,14 +1,10 @@
 """
 components.py — Streamlit 可复用 UI 组件
 
-提供天气卡片、新闻卡片、简报正文、加载动画、错误提示等组件。
-每个组件可直接在 Streamlit 页面中调用。
-
-使用方：前端界面模块（芦泓天）
+适配 FastAPI 后端返回的 dict 格式数据。
 """
 
 import streamlit as st
-from models.news import NewsItem
 from utils.format_utils import empty_to_default
 
 
@@ -37,28 +33,40 @@ def render_weather_card(weather_summary: str = None):
         st.markdown("---")
 
 
-def render_news_card(item: NewsItem) -> None:
-    """渲染单条新闻卡片
+def render_news_card(item: dict) -> None:
+    """渲染单条新闻卡片（接受 dict 格式）
 
     Args:
-        item: NewsItem 数据对象
+        item: dict 或 NewsItem 对象，包含 title/summary/source/url/publish_time/category
     """
-    if not item or not item.title:
+    # 兼容 dict 和对象两种格式
+    def _get(key, default=""):
+        if isinstance(item, dict):
+            return item.get(key, default)
+        return getattr(item, key, default)
+
+    title = _get("title")
+    if not title:
         return
 
     with st.container():
-        st.markdown(
-            f"### 📰 {item.title}",
-        )
+        st.markdown(f"### 📰 {title}")
         cols = st.columns([3, 1])
         with cols[0]:
-            st.caption(f"来源：{empty_to_default(item.source)}")
+            st.caption(f"来源：{empty_to_default(_get('source'))}")
         with cols[1]:
-            st.caption(f"时间：{empty_to_default(item.publish_time, '')}")
-        if item.summary:
-            st.write(item.summary)
-        if item.url:
-            st.markdown(f"[🔗 阅读原文]({item.url})")
+            st.caption(f"分类：{empty_to_default(_get('category', '综合'))}")
+
+        publish_time = _get("publish_time", "")
+        if publish_time:
+            st.caption(f"🕒 {publish_time}")
+
+        summary = _get("summary", "")
+        if summary:
+            st.write(summary)
+        url = _get("url", "")
+        if url:
+            st.markdown(f"[🔗 阅读原文]({url})")
         st.markdown("---")
 
 
@@ -66,7 +74,7 @@ def render_news_list(news_items: list) -> None:
     """渲染新闻列表
 
     Args:
-        news_items: NewsItem 列表
+        news_items: NewsItem 列表或 dict 列表
     """
     if not news_items:
         st.info("📭 暂无新闻内容")
@@ -107,29 +115,17 @@ def render_loading():
 
 
 def render_error(message: str = "生成简报时发生错误"):
-    """渲染错误提示
-
-    Args:
-        message: 错误信息
-    """
+    """渲染错误提示"""
     st.error(f"❌ {message}")
 
 
 def render_info(message: str):
-    """渲染信息提示
-
-    Args:
-        message: 提示信息
-    """
+    """渲染信息提示"""
     st.info(f"💡 {message}")
 
 
 def render_success(message: str):
-    """渲染成功提示
-
-    Args:
-        message: 成功信息
-    """
+    """渲染成功提示"""
     st.success(f"✅ {message}")
 
 
@@ -151,9 +147,7 @@ def render_header():
 
 
 def render_sidebar():
-    """渲染侧边栏快捷设置
-
-    返回用户选择的配置字典，包含城市、模型、新闻分类。
+    """侧边栏（保留旧接口，向后兼容）
 
     Returns:
         dict: {"city": str, "model": str, "categories": list[str]}
@@ -164,9 +158,8 @@ def render_sidebar():
 
     city = st.sidebar.text_input("🏙 城市", value=DEFAULT_CITY)
 
-    # 模型选择
-    model_options = ["deepseek", "zhipu", "qwen"]
-    model_display_names = [AI_MODELS[m] for m in model_options]
+    model_options = ["deepseek", "zhipu", "qwen", "claude"]
+    model_display_names = [AI_MODELS.get(m, m.upper()) for m in model_options]
     default_idx = model_options.index(DEFAULT_MODEL) if DEFAULT_MODEL in model_options else 0
 
     selected_index = st.sidebar.selectbox(
@@ -177,15 +170,11 @@ def render_sidebar():
     )
     selected_model_key = model_options[model_display_names.index(selected_index)]
 
-    # 新闻分类选择
     selected_categories = st.sidebar.multiselect(
         "📰 新闻分类",
         options=NEWS_CATEGORIES,
         default=["科技", "综合"],
     )
-
-    st.sidebar.markdown("---")
-    st.sidebar.page_link("pages/settings.py", label="📋 完整设置")
 
     return {
         "city": city.strip() if city.strip() else DEFAULT_CITY,

@@ -1,0 +1,13 @@
+# FastAPI 后端依赖
+fastapi>=0.110.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+httpx>=0.26.0
+python-dotenv>=1.0.0
+
+# AI 适配器（Anthropic 官方 SDK）
+anthropic>=0.18.0
+
+# 兼容原有依赖
+requests>=2.31.0
+feedparser>=6.0.0  # RSS 解析

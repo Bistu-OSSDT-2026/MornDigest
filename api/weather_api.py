@@ -1,14 +1,20 @@
 """
 weather_api.py — 天气数据获取模块
 
-调用和风天气 (QWeather) API 获取实时天气和预报数据，
-解析后返回标准化的 WeatherData 对象。
+调用和风天气 (QWeather) API 获取实时天气和预报数据。
+
+支持专属子账号（sub-host）的路径差异：
+    公共账号路径: /v2/city/lookup
+    专属子账号:   /geo/v2/city/lookup  (前缀多了 /geo/)
+
+通过 QWEATHER_USE_GEO_PREFIX=true 自动启用专属子账号模式。
 
 实现方：芦泓天
 """
 
 import logging
 import requests
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -24,17 +30,53 @@ class WeatherAPIError(Exception):
     pass
 
 
+# 公共域名
+PUBLIC_GEO_HOST = "https://geoapi.qweather.com"
+PUBLIC_DEV_HOST = "https://devapi.qweather.com"
+
+
+def _is_sub_account() -> bool:
+    """是否使用专属子账号模式
+    
+    当设置了 QWEATHER_API_HOST 或 QWEATHER_USE_GEO_PREFIX 时启用
+    """
+    return bool(
+        os.environ.get("QWEATHER_API_HOST") or
+        os.environ.get("QWEATHER_USE_GEO_PREFIX", "").lower() in ("true", "1", "yes")
+    )
+
+
+def _get_geo_host() -> str:
+    """地理编码 Host"""
+    custom = os.environ.get("QWEATHER_GEO_HOST") or os.environ.get("QWEATHER_API_HOST")
+    if custom:
+        return custom.rstrip("/")
+    return PUBLIC_GEO_HOST
+
+
+def _get_dev_host() -> str:
+    """数据接口 Host"""
+    custom = os.environ.get("QWEATHER_DEV_HOST") or os.environ.get("QWEATHER_API_HOST")
+    if custom:
+        return custom.rstrip("/")
+    return PUBLIC_DEV_HOST
+
+
+def _geo_path() -> str:
+    """地理编码接口路径
+    
+    专属子账号需要 /geo 前缀
+    """
+    if _is_sub_account():
+        return "/geo/v2/city/lookup"
+    return "/v2/city/lookup"
+
+
 def fetch_weather(city: str) -> WeatherData:
     """从和风天气 API 获取指定城市天气数据
 
-    步骤：
-        1. 调用地理编码接口获取 location_id
-        2. 调用实时天气接口获取当前天气
-        3. 调用预报接口获取未来 N 日数据
-        4. 解析并组装为标准 WeatherData 对象返回
-
     Args:
-        city: 城市名，如 "北京"
+        city: 城市名
 
     Returns:
         WeatherData: 标准化天气数据对象
@@ -68,7 +110,8 @@ def fetch_weather(city: str) -> WeatherData:
 def _get_location_id(city: str, api_key: str) -> str:
     """城市名转换location_id"""
 
-    url = "https://geoapi.qweather.com/v2/city/lookup"
+    url = f"{_get_geo_host()}{_geo_path()}"
+    logger.debug("地理编码 URL: %s", url)
 
     params = {
         "location": city,
@@ -82,6 +125,11 @@ def _get_location_id(city: str, api_key: str) -> str:
             timeout=API_TIMEOUT
         )
 
+        if response.status_code != 200:
+            raise WeatherAPIError(
+                f"城市查询失败: HTTP {response.status_code}, body={response.text[:200]}"
+            )
+
         data = response.json()
 
         if data.get("code") != "200":
@@ -92,6 +140,8 @@ def _get_location_id(city: str, api_key: str) -> str:
         return data["location"][0]["id"]
 
 
+    except WeatherAPIError:
+        raise
     except Exception as e:
         raise WeatherAPIError(
             f"城市查询异常: {e}"
@@ -100,7 +150,7 @@ def _get_location_id(city: str, api_key: str) -> str:
 
 def _get_realtime_weather(location_id: str, api_key: str) -> dict:
 
-    url = "https://devapi.qweather.com/v7/weather/now"
+    url = f"{_get_dev_host()}/v7/weather/now"
 
     params = {
         "location": location_id,
@@ -113,6 +163,11 @@ def _get_realtime_weather(location_id: str, api_key: str) -> dict:
             params=params,
             timeout=API_TIMEOUT
         )
+
+        if response.status_code != 200:
+            raise WeatherAPIError(
+                f"实时天气获取失败: HTTP {response.status_code}, body={response.text[:200]}"
+            )
 
         data = response.json()
 
@@ -124,6 +179,8 @@ def _get_realtime_weather(location_id: str, api_key: str) -> dict:
 
         return data
 
+    except WeatherAPIError:
+        raise
     except Exception as e:
 
         raise WeatherAPIError(
@@ -132,7 +189,7 @@ def _get_realtime_weather(location_id: str, api_key: str) -> dict:
 
 def _get_forecast(location_id: str, api_key: str) -> list:
 
-    url = "https://devapi.qweather.com/v7/weather/7d"
+    url = f"{_get_dev_host()}/v7/weather/7d"
 
     params = {
         "location": location_id,
@@ -147,6 +204,11 @@ def _get_forecast(location_id: str, api_key: str) -> list:
             timeout=API_TIMEOUT
         )
 
+        if response.status_code != 200:
+            raise WeatherAPIError(
+                f"天气预报获取失败: HTTP {response.status_code}, body={response.text[:200]}"
+            )
+
         data = response.json()
 
         if data.get("code") != "200":
@@ -155,6 +217,8 @@ def _get_forecast(location_id: str, api_key: str) -> list:
             )
 
         return data.get("daily", [])
+    except WeatherAPIError:
+        raise
     except Exception as e:
 
         raise WeatherAPIError(
@@ -172,9 +236,6 @@ def _build_weather_data(city: str, now_data: dict, forecast_data: list) -> Weath
     Returns:
         WeatherData 对象
     """
-    # 解析 now_data 和 forecast_data 字段
-    # 组装 forecast 文本，如 ["明天: 晴 15-20°", "后天: 多云 13-18°"]
-
     weather = WeatherData()
     weather.city = city
     weather.date = datetime.now().strftime("%Y-%m-%d")
