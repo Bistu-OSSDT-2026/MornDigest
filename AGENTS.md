@@ -2,8 +2,26 @@
 
 > AI晨间智能简报工具 — 轻量化个人信息聚合网页，如私人助理般每日自动汇总多类信息生成晨间简报。
 >
-> **最后更新**: 2026-07-08 23:58:09
-> **更新者**: 刘奕铮（框架搭建与审查完毕）
+> **最后更新**: 2026-07-09 16:10:00
+> **更新者**: 刘奕铮（框架搭建与审查完毕）; 崔锦崧（storage 模块补全 + 文档同步）
+
+---
+
+## 📌 本版本变更日志 (2026-07-09 崔锦崧)
+
+本人在本分支对项目做以下改动（不影响现有任何代码接口）：
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 新增 | `tests/test_storage.py` | 13 个 storage 专项测试（SqliteStore 8 + JsonStore 3 + 工厂 2） |
+| 新增 | `storage/README.md` | storage 模块使用文档（接口 / 调用示例 / 后端切换 / 扩展指引） |
+| 修改 | `AGENTS.md` | §8 崔锦崧状态补全；§11.2 测试数 16→29；§11.3 加 storage 测试条目 |
+| 修改 | `SPEC.md` | §10 路线图 Phase 2 存储模块勾选完成；附录 D 测试数 16→29 并加 storage 类别 |
+| 修改 | `README.md` | 修复合并冲突标记（`<=======>` 残留）；功能/结构/状态中同步 storage 测试覆盖 |
+
+**接口影响**：**零**。`storage/` 下的 `__init__.py` / `base.py` / `sqlite_store.py` / `json_store.py` 四个文件**完全未动**，`save_brief` / `list_briefs` / `save_prefs` / `load_prefs` 五个公开方法签名不变。
+
+**测试结果**：`pytest tests/ -v` → 29 passed。
 
 ---
 
@@ -584,7 +602,7 @@ from models.weather import WeatherData
 | 刘奕铮 | 框架基建 + 核心编排 | `config/` `models/` `services/` `utils/` | **已完成** 框架搭建 |
 | 芦泓天 | 前端界面 + 数据源 | `frontend/` `api/` | 待填充 TODO |
 | 刘志杰 | AI 模型接入 | `ai/` | 待填充 TODO |
-| 崔锦崧 | 数据持久化 | `storage/` | **已完成**（双后端均实现） |
+| 崔锦崧 | 数据持久化 | `storage/` | **已完成**（双后端 + 13 个专项测试 + README） |
 | 刘诗钰 | 拓展功能 + 自测 + 文档 | `tests/` 文档 | 骨架已完成 |
 
 ---
@@ -636,11 +654,12 @@ pytest tests/ -v
 pytest tests/test_brief_flow.py -v
 ```
 
-当前测试覆盖 16 个用例：
+当前测试覆盖 **29 个用例**（16 个流程 + 13 个 storage 专项）：
 - 6 个数据模型测试（序列化/反序列化/嵌套/默认值）
 - 2 个配置测试（settings + constants）
 - 5 个工具函数测试（验证器 + 格式化工具 + 日期工具）
 - 3 个 AI 骨架测试（3 个 Bot 可实例化 + 基类异常）
+- 13 个 storage 专项测试（SqliteStore 8 + JsonStore 3 + Factory 2，详见 `storage/README.md` §8）
 
 ### 11.3 框架审查记录
 
@@ -656,6 +675,7 @@ pytest tests/test_brief_flow.py -v
 | 工具函数（10 个） | ✅ 通过 |
 | JsonStore CRUD + 更新覆盖 | ✅ 通过 |
 | SqliteStore CRUD + 默认回退 | ✅ 通过 |
+| **storage 专项测试 13 例 + 模块 README**（崔锦崧 2026-07-09 补全） | ✅ 通过 |
 | AI 模块骨架（实例化 + 异常 + 提示词） | ✅ 通过 |
 
 ---
