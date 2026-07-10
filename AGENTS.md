@@ -294,9 +294,9 @@ from ai.qwen import QwenBot
 
 | 方法 | 签名 | 类型 | 说明 |
 |------|------|------|------|
-| `generate_brief` | `(weather: WeatherData, news: list) -> BriefReport` | **abstract** | 必须实现 |
+| `generate_brief` | `(weather: WeatherData, news: list) -> BriefReport` | **abstract** | 已由三家 Bot 实现 |
 | `_build_prompt` | `(weather: WeatherData, news: list) -> str` | default | 基类已实现完整提示词模板 |
-| `_parse_response` | `(raw_response: str, weather: WeatherData, news: list) -> BriefReport` | default | 基类已实现默认解析 |
+| `_parse_response` | `(raw_response: str, weather: WeatherData, news: list) -> BriefReport` | default | **三家 Bot 各自覆盖**，按"1.天气摘要 / 2.简报正文"切两段 |
 
 **基类内置 `_build_prompt()` 提示词结构**：
 1. 角色设定（专业晨间简报助手）
@@ -305,17 +305,33 @@ from ai.qwen import QwenBot
 4. 输出格式要求（天气100字以内 + 简报200-400字）
 5. 语气约束（温暖友好、纯文本、不用Markdown）
 
-**基类内置 `_parse_response()` 默认实现**：将 AI 返回文本同时填入 `weather_summary` 和 `digest`。
+**三家 Bot 实现要点**（已完成）：
 
-**模型工厂**：建议使用 `services.brief_service.get_ai_bot(model_name)` 创建实例。
+| 适配器 | 模型名 | SDK | Base URL / 配置 | 异常处理 |
+|--------|--------|-----|------------------|----------|
+| `DeepSeekBot` | `deepseek-chat` | `openai>=1.0.0` | `https://api.deepseek.com/v1` | `AuthenticationError` / `APITimeoutError` / `APIConnectionError` / `APIError` 分别捕获 |
+| `ZhipuBot` | `glm-4-flash` | `zhipuai>=2.0.0` | 默认 | `APIAuthenticationError` / `APITimeoutError` / `APIConnectionError` / `APIStatusError` / `ZhipuAIError` 分别捕获 |
+| `QwenBot` | `qwen-plus`（可改） | `dashscope>=1.14.0` | 默认 | 手动检查 `status_code == 200`，捕获网络/SDK 异常 |
+
+**懒加载**：`_get_client()` / `_get_api_key()` 只在首次调用时读取 key，未配置时抛 `AModelError` 并附带明确的 key 名称提示。
+
+**备选模型**（修改 `ai/qwen.py` 的 `_QWEN_MODEL` 一行即可切换）：
+- `qwen-turbo`：更快，便宜
+- `qwen-plus`：默认，综合强
+- `qwen-max`：最强
+- `qwen-long`：超长上下文（适合大量新闻）
+- `glm-5.1`：智谱 GLM 系列（百炼平台提供）
+
+**真机测试脚本**：`scripts/test_qwen_bailian.py` — 填入 key 后一键验证 Qwen 调用效果。
 
 **SDK 参考**：
 - DeepSeek: [api-docs.deepseek.com](https://api-docs.deepseek.com/) — 兼容 OpenAI 协议，使用 `openai` SDK
 - 智谱AI: [open.bigmodel.cn/dev/api](https://open.bigmodel.cn/dev/api) — 使用 `zhipuai` SDK
-- 通义千问: [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/) — 使用 `dashscope` SDK
+- 通义千问: [help.aliyun.com/zh/dashscope](https://help.aliyun.com/zh/dashscope/) — 使用 `dashscope` SDK
+- 阿里云百炼: [bailian.console.aliyun.com](https://bailian.console.aliyun.com/) — 与 DashScope 同 API
 
 **调用方**：`services/brief_service.py`
-**实现方**：刘志杰
+**实现方**：刘志杰（**✅ 已完成**）
 
 ### 4.5 存储模块 (`storage/`)
 
@@ -604,6 +620,11 @@ from models.weather import WeatherData
 | 刘志杰 | AI 模型接入 | `ai/` | 待填充 TODO |
 | 崔锦崧 | 数据持久化 | `storage/` | **已完成**（双后端 + 13 个专项测试 + README） |
 | 刘诗钰 | 拓展功能 + 自测 + 文档 | `tests/` 文档 | 骨架已完成 |
+| 刘奕铮 | 框架基建 + 核心编排 | `config/` `models/` `services/` `utils/` | ✅ 框架搭建完毕 |
+| 芦泓天 | 前端界面 + 数据源 | `frontend/` `api/` | 🚧 进行中 |
+| **刘志杰** | **AI 模型接入** | **`ai/`** | **✅ 已完成**（三家模型 + 31 个单测 + 真机验证脚本） |
+| 崔锦崧 | 数据持久化 | `storage/` | ✅ 双后端均实现 |
+| 刘诗钰 | 拓展功能 + 自测 + 文档 | `tests/` `scripts/` 文档 | 🚧 进行中 |
 
 ---
 
@@ -660,6 +681,18 @@ pytest tests/test_brief_flow.py -v
 - 5 个工具函数测试（验证器 + 格式化工具 + 日期工具）
 - 3 个 AI 骨架测试（3 个 Bot 可实例化 + 基类异常）
 - 13 个 storage 专项测试（SqliteStore 8 + JsonStore 3 + Factory 2，详见 `storage/README.md` §8）
+当前测试覆盖 **47 个用例**（31 新增 + 16 原有）：
+- 6 个数据模型测试（序列化/反序列化/嵌套/默认值）
+- 2 个配置测试（settings + constants）
+- 5 个工具函数测试（验证器 + 格式化工具 + 日期工具）
+- **31 个 AI 模块测试**（`tests/test_ai_bots.py`）：
+  - 3 个 Bot 类签名（model_name/model_display/inheritance）
+  - 2 个 services.get_ai_bot 工厂
+  - 4 个缺失 API Key 行为
+  - 4 个 _build_prompt 渲染（含空新闻兜底）
+  - 8 个 _parse_response 解析（标准格式/纯段落/单段/空响应/news_items/created_at/date兜底）
+  - 4 个三家 Provider 端到端 mock（deepseek/zhipu/qwen + settings key 来源）
+  - 6 个异常分类（鉴权/超时/连接/接口/空内容）
 
 ### 11.3 框架审查记录
 
@@ -682,13 +715,13 @@ pytest tests/test_brief_flow.py -v
 
 ## 附录 A: 待实现 TODO 清单
 
-| 文件 | 负责人 | 内容 |
-|------|--------|------|
-| `api/weather_api.py` | 芦泓天 | 实现和风天气 3 步调用（地理编码 → 实时天气 → 预报） |
-| `api/news_api.py` | 芦泓天 | 实现新闻 API 请求 + 分类映射 |
-| `ai/deepseek.py` | 刘志杰 | 初始化 OpenAI 兼容客户端 + 调用 DeepSeek API |
-| `ai/zhipu.py` | 刘志杰 | 初始化 zhipuai 客户端 + 调用智谱 API |
-| `ai/qwen.py` | 刘志杰 | 初始化 dashscope + 调用通义千问 API |
+| 文件 | 负责人 | 内容 | 状态 |
+|------|--------|------|------|
+| `api/weather_api.py` | 芦泓天 | 实现和风天气 3 步调用（地理编码 → 实时天气 → 预报） | ⏳ |
+| `api/news_api.py` | 芦泓天 | 实现新闻 API 请求 + 分类映射 | ⏳ |
+| ~~`ai/deepseek.py`~~ | ~~刘志杰~~ | ~~初始化 OpenAI 兼容客户端 + 调用 DeepSeek API~~ | **✅ 已完成** |
+| ~~`ai/zhipu.py`~~ | ~~刘志杰~~ | ~~初始化 zhipuai 客户端 + 调用智谱 API~~ | **✅ 已完成** |
+| ~~`ai/qwen.py`~~ | ~~刘志杰~~ | ~~初始化 dashscope + 调用通义千问 API~~ | **✅ 已完成** |
 
 ---
 

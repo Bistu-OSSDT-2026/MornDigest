@@ -55,7 +55,9 @@ cp .env.example .env
 | `NEWS_KEY` | 新闻接口 | 待定 |
 | `DEEPSEEK_KEY` | DeepSeek | https://platform.deepseek.com/ |
 | `ZHIPU_KEY` | 智谱AI | https://open.bigmodel.cn/ |
-| `QWEN_KEY` | 通义千问 | https://dashscope.console.aliyun.com/ |
+| `QWEN_KEY` | 通义千问 / 阿里云百炼 | https://dashscope.console.aliyun.com/ 或 https://bailian.console.aliyun.com/ |
+
+> **百炼平台说明**：`QWEN_KEY` 同时支持阿里云 DashScope 和百炼（Bailian）平台。百炼平台上还可调用第三方模型（如 `glm-5.1`），具体可用模型见 `ai/qwen.py` 中的 `_QWEN_MODEL` 注释。
 
 ### 3. 启动应用
 
@@ -69,8 +71,20 @@ streamlit run run.py
 
 ```bash
 pytest tests/            # 运行全部 29 个测试用例 (16 流程 + 13 storage 专项)
+pytest tests/            # 运行全部 47 个测试用例
 pytest tests/ -v         # 详细输出
 ```
+
+### 5. 真机测试 AI 模型（快速验证 key 可用）
+
+```bash
+# Windows PowerShell
+$env:QWEN_KEY = "sk-your-bailian-key"
+$env:PYTHONIOENCODING = "utf-8"
+python scripts\test_qwen_bailian.py
+```
+
+详见 `scripts/test_qwen_bailian.py`。
 
 ## 📁 项目结构
 
@@ -85,6 +99,13 @@ MornDigest/
 ├── services/     # 业务逻辑编排（简报生成 + 定时调度）
 ├── utils/        # 公共工具函数（日期/格式化/验证）
 ├── tests/        # 测试（16 流程 + 13 storage 专项）→ 刘诗钰 + 崔锦崧
+├── ai/           # AI 大模型调用 (AIModel基类 + 3适配器，已完成) → 刘志杰
+├── storage/      # 数据持久化（JSON / SQLite 双后端）→ 崔锦崧
+├── frontend/     # Streamlit 前端（主页面 + 设置页 + UI组件）→ 芦泓天
+├── services/     # 业务逻辑编排（简报生成 + 定时调度）
+├── utils/        # 公共工具函数（日期/格式化/验证）
+├── tests/        # 测试（47 个用例）→ 刘诗钰
+├── scripts/      # 辅助脚本（如百炼真机测试）
 ├── run.py        # 项目入口
 ├── AGENTS.md     # 协作规范与技术标准
 ├── SPEC.md       # 产品规格与技术设计文档
@@ -104,15 +125,15 @@ MornDigest/
 
 ## 👥 团队
 
-| 人员 | 职责 | 负责模块 |
-|------|------|----------|
-| 刘奕铮 | 框架基建 + 核心编排 | `config/` `models/` `services/` `utils/` |
-| 芦泓天 | 前端 & 数据源 | `frontend/` `api/` |
-| 刘志杰 | AI 模型接入 | `ai/` |
-| 崔锦崧 | 数据持久化 | `storage/` |
-| 刘诗钰 | 拓展功能 & 自测 & 文档 | `tests/` 文档 |
+| 人员 | 职责 | 负责模块 | 当前状态 |
+|------|------|----------|----------|
+| 刘奕铮 | 框架基建 + 核心编排 | `config/` `models/` `services/` `utils/` | ✅ 框架搭建完毕 |
+| 芦泓天 | 前端 & 数据源 | `frontend/` `api/` | 进行中 |
+| **刘志杰** | **AI 模型接入** | **`ai/`** | **✅ 已完成** |
+| 崔锦崧 | 数据持久化 | `storage/` | ✅ 双后端均实现 |
+| 刘诗钰 | 拓展功能 & 自测 & 文档 | `tests/` `scripts/` 文档 | 进行中 |
 
-## 🏗 框架搭建状态
+## 🏗 项目进度
 
 框架基建已全部完成，包括：
 
@@ -128,6 +149,21 @@ MornDigest/
 - ✅ 全面审查（语法 / 导入 / 接口 / 功能 全部通过）
 
 待各模块负责人填充 TODO 后即可进入联调阶段。
+
+## 📜 开源协议
+
+MIT License — 详见 [LICENSE](LICENSE)
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| 配置管理 (`config/`) | ✅ 完成 | Settings 单例 + 17 项常量 |
+| 数据模型 (`models/`) | ✅ 完成 | 4 个 dataclass + 双向序列化 |
+| 数据持久化 (`storage/`) | ✅ 完成 | JSON + SQLite 双后端 |
+| 核心编排 (`services/brief_service.py`) | ✅ 完成 | 5 步流水线 + 模型工厂 |
+| **AI 大模型 (`ai/`)** | **✅ 完成** | **DeepSeek / 智谱GLM / 通义Qwen 三家适配** |
+| 前端界面 (`frontend/`) | 🚧 进行中 | Streamlit 主页面 + 设置页 |
+| 天气 & 新闻 API (`api/`) | 🚧 进行中 | 待填充 SDK 调用 |
+| 单元测试 (`tests/`) | ✅ 47 个用例 | 数据模型/配置/工具/AI 全部覆盖 |
+| 定时调度 (`services/scheduler.py`) | ⏳ 待开发 | 拓展功能 |
 
 ## 📜 开源协议
 

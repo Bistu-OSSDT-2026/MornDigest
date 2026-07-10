@@ -420,32 +420,70 @@ class AIModel(ABC):
 ```
 
 ```python
-# ai/deepseek.py — DeepSeek 适配器 (骨架已就绪，待填充)
+# ai/deepseek.py — DeepSeek 适配器 ✅ 已完成
 from ai.base import AIModel, AModelError
+from openai import OpenAI, AuthenticationError, APITimeoutError, APIConnectionError, APIError
+from config.settings import settings
+
 class DeepSeekBot(AIModel):
     model_name = "deepseek"
     model_display = "DeepSeek"
 
-    def _get_client(self):
-        # TODO: 刘志杰 — 初始化 OpenAI 兼容客户端
-        # 参考: https://api-docs.deepseek.com/
-        pass
+    def _get_client(self):  # 懒加载
+        if self._client is None:
+            api_key = settings.get("DEEPSEEK_KEY")
+            if not api_key:
+                raise AModelError("DeepSeek API Key (DEEPSEEK_KEY) 未配置")
+            self._client = OpenAI(
+                api_key=api_key, base_url="https://api.deepseek.com/v1", timeout=60,
+            )
+        return self._client
 
     def generate_brief(self, weather, news):
+        client = self._get_client()
         prompt = self._build_prompt(weather, news)
-        # TODO: 刘志杰 — 调用 DeepSeek API 并返回 BriefReport
-        raise AModelError("DeepSeek 模型接入待实现")
+        try:
+            response = client.chat.completions.create(
+                model="deepseek-chat",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.7, max_tokens=2000, timeout=60,
+            )
+        except AuthenticationError as e:
+            raise AModelError(f"DeepSeek 鉴权失败，请检查 DEEPSEEK_KEY: {e}") from e
+        except APITimeoutError as e:
+            raise AModelError(f"DeepSeek 调用超时: {e}") from e
+        except APIConnectionError as e:
+            raise AModelError(f"DeepSeek 网络连接失败: {e}") from e
+        except APIError as e:
+            raise AModelError(f"DeepSeek 接口错误: {e}") from e
+        raw = response.choices[0].message.content or ""
+        return self._parse_response(raw, weather, news)
 ```
 
 ```python
-# ai/zhipu.py — 智谱AI 适配器 (骨架已就绪，待填充)
-# TODO: 刘志杰 — 参考 https://open.bigmodel.cn/dev/api
-# 使用 zhipuai SDK
-
-# ai/qwen.py — 通义千问 适配器 (骨架已就绪，待填充)
-# TODO: 刘志杰 — 参考 https://help.aliyun.com/zh/dashscope/
-# 使用 dashscope SDK
+# ai/zhipu.py — 智谱AI 适配器 ✅ 已完成
+from zhipuai import ZhipuAI
+from zhipuai.core._errors import (
+    APIStatusError, APITimeoutError, APIConnectionError,
+    APIAuthenticationError, ZhipuAIError,
+)
+# model="glm-4-flash"，其他逻辑同 DeepSeekBot
 ```
+
+```python
+# ai/qwen.py — 通义千问 适配器 ✅ 已完成（兼容阿里云百炼）
+import dashscope
+from dashscope import Generation
+# model="qwen-plus"（默认，可改为 qwen-turbo/qwen-max/qwen-long/glm-5.1）
+# 手动检查 response.status_code == 200
+# 兼容百炼（Bailian）平台 API Key
+```
+
+**实现要点**：
+- 三家 Bot 各自覆盖 `_parse_response`，按"1.天气摘要 / 2.简报正文"切两段，找不到标记时按空行分段 fallback
+- 鉴权/超时/连接/接口错误分别捕获并包装为 `AModelError`，附中文提示
+- `_get_client()` / `_get_api_key()` 懒加载，缺失 key 时调用才抛错
+- Qwen 手动检查 DashScope 特有的 `status_code` 字段
 
 #### 提示词工程要点
 
@@ -931,11 +969,14 @@ streamlit run run.py
 - [x] 框架全面审查（语法/导入/接口/功能 全通过）
 
 ### Phase 2: 并行开发
+
 - [ ] 前端界面完善 (芦泓天)
 - [ ] 天气 API 实现 (芦泓天) — 参考和风天气文档
 - [ ] 新闻 API 实现 (芦泓天) — 确定新闻源
 - [ ] AI 模型接入 (刘志杰) — 填充 3 个 Bot 的 generate_brief
 - [x] 存储模块完善 (崔锦崧) — 2026-07-09 补全 13 个专项测试 + 模块 README
+- [ ] **AI 模型接入 (刘志杰) — DeepSeek/智谱/通义三家 SDK 接入 + 异常分类 + 懒加载 + 31 个单元测试 + `scripts/test_qwen_bailian.py` 真机验证脚本
+- [ ] 存储模块完善 (崔锦崧) — 框架已完成，可按需优化
 
 ### Phase 3: 集成测试
 - [ ] 功能联调（API + AI 全部接入后）
@@ -1040,6 +1081,32 @@ pytest tests/test_storage.py -v     # 只跑 storage 专项
 | **Storage 专项** | `test_sqlite_init_creates_db_file` 等 8 例 | SqliteStore 初始化 / 父目录 / CRUD / 覆盖 / 默认回退 |
 | | `test_json_save_then_get_brief` 等 3 例 | JsonStore CRUD / 覆盖 / 偏好 |
 | | `test_create_storage_defaults_to_json` 等 2 例 | 工厂默认 + env 切换 |
+### 当前测试覆盖（47 个用例 = 31 新增 + 16 原有）
+
+| 类别 | 测试文件 | 用例数 | 覆盖内容 |
+|------|----------|--------|----------|
+| **数据模型** | `test_brief_flow.py` | 6 | 序列化/反序列化/嵌套/默认值 |
+| **配置** | `test_brief_flow.py` | 2 | settings + constants |
+| **工具函数** | `test_brief_flow.py` | 5 | 验证器/格式化/日期工具 |
+| **AI 骨架** | `test_brief_flow.py` | 3 | 基类异常 + 3 Bot 可实例化 |
+| **AI 模块** | `test_ai_bots.py` | **31** | 详见下表 |
+
+#### AI 模块 31 个用例细分（`tests/test_ai_bots.py`）
+
+| 分组 | 用例数 | 测试函数 |
+|------|--------|----------|
+| 类签名 | 3 | `test_three_bots_have_distinct_model_names`、`test_three_bots_inherit_aimodel`、`test_model_display_in_chinese` |
+| 工厂 | 2 | `test_get_ai_bot_returns_correct_instance`、`test_get_ai_bot_invalid_name_raises` |
+| 缺 key | 4 | `test_deepseek_missing_key_raises`、`test_zhipu_missing_key_raises`、`test_qwen_missing_key_raises`、`test_key_loaded_lazily_only_once` |
+| Prompt 渲染 | 4 | `test_build_prompt_contains_weather`、`test_build_prompt_contains_news`、`test_build_prompt_handles_empty_news`、`test_build_prompt_contains_output_instructions` |
+| 解析 | 8 | `test_parse_standard_marked_format`、`test_parse_plain_paragraph_format`、`test_parse_single_paragraph_fallback`、`test_parse_empty_response_raises`、`test_parse_whitespace_only_raises`、`test_parse_preserves_news_items`、`test_parse_sets_created_at`、`test_parse_falls_back_to_today_when_date_missing` |
+| 端到端 mock | 4 | `test_deepseek_generate_brief_end_to_end`、`test_deepseek_generate_brief_uses_settings_key`、`test_zhipu_generate_brief_end_to_end`、`test_qwen_generate_brief_end_to_end` |
+| 异常分类 | 6 | `test_deepseek_authentication_error_wrapped`、`test_deepseek_timeout_error_wrapped`、`test_deepseek_connection_error_wrapped`、`test_qwen_non_200_status_raises`、`test_qwen_empty_response_raises`、`test_deepseek_empty_response_raises` |
+
+**测试特性**：
+- 全部使用 `unittest.mock.patch` 替换三家 SDK，**无需真实 API Key**，CI 可直接跑
+- `monkeypatch` fixture 自动清理环境变量，避免污染其他测试
+- 覆盖 happy path + edge case + 异常分类三类场景
 
 ### 添加新测试
 
