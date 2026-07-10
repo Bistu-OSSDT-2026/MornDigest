@@ -2,7 +2,25 @@
 
 > AI晨间智能简报工具
 > v0.1.0 (初始版本)
-> 最后更新: 2026-07-08
+> 最后更新: 2026-07-09 (崔锦崧 补全 storage 测试 + 文档同步)
+
+---
+
+## 📌 本版本变更日志 (2026-07-09 崔锦崧)
+
+本人在本分支对项目做以下改动（不影响现有任何代码接口）：
+
+| 类别 | 文件 | 改动 |
+|------|------|------|
+| 新增 | `tests/test_storage.py` | 13 个 storage 专项测试（SqliteStore 8 + JsonStore 3 + 工厂 2） |
+| 新增 | `storage/README.md` | storage 模块使用文档 |
+| 修改 | `AGENTS.md` | 团队状态 / 测试数 / 审查记录同步 |
+| 修改 | `SPEC.md` | §10 路线图 Phase 2 存储模块勾选完成；附录 D 测试指南同步 |
+| 修改 | `README.md` | 修复合并冲突标记 + 同步 storage 测试覆盖 |
+
+**接口影响**：**零**。`storage/` 目录 4 个核心文件未动。
+
+**测试结果**：`pytest tests/ -v` → 29 passed（16 流程 + 13 storage 专项）。
 
 ---
 
@@ -917,7 +935,7 @@ streamlit run run.py
 - [ ] 天气 API 实现 (芦泓天) — 参考和风天气文档
 - [ ] 新闻 API 实现 (芦泓天) — 确定新闻源
 - [ ] AI 模型接入 (刘志杰) — 填充 3 个 Bot 的 generate_brief
-- [ ] 存储模块完善 (崔锦崧) — 框架已完成，可按需优化
+- [x] 存储模块完善 (崔锦崧) — 2026-07-09 补全 13 个专项测试 + 模块 README
 
 ### Phase 3: 集成测试
 - [ ] 功能联调（API + AI 全部接入后）
@@ -996,9 +1014,10 @@ streamlit run run.py
 pytest tests/          # 运行全部测试
 pytest tests/ -v       # 详细输出
 pytest tests/test_brief_flow.py -v  # 指定文件
+pytest tests/test_storage.py -v     # 只跑 storage 专项
 ```
 
-### 当前测试覆盖（16 个用例）
+### 当前测试覆盖（29 个用例 = 16 流程 + 13 storage 专项）
 
 | 类别 | 测试函数 | 覆盖内容 |
 |------|----------|----------|
@@ -1018,6 +1037,9 @@ pytest tests/test_brief_flow.py -v  # 指定文件
 | | `test_deepseek_bot_instantiable` | DeepSeekBot 可实例化 |
 | | `test_zhipu_bot_instantiable` | ZhipuBot 可实例化 |
 | | `test_qwen_bot_instantiable` | QwenBot 可实例化 |
+| **Storage 专项** | `test_sqlite_init_creates_db_file` 等 8 例 | SqliteStore 初始化 / 父目录 / CRUD / 覆盖 / 默认回退 |
+| | `test_json_save_then_get_brief` 等 3 例 | JsonStore CRUD / 覆盖 / 偏好 |
+| | `test_create_storage_defaults_to_json` 等 2 例 | 工厂默认 + env 切换 |
 
 ### 添加新测试
 
