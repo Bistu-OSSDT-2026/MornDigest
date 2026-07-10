@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Python
 __pycache__/
 *.py[cod]
@@ -16,10 +15,12 @@ ENV/
 
 # Environment variables — NEVER commit real keys
 .env
+.streamlit/secrets.toml
 
 # IDE
 .vscode/
 .idea/
+*.swp
 *.swp
 *.swo
 *~
@@ -33,8 +34,7 @@ data/*.bak
 .DS_Store
 Thumbs.db
 
-# Streamlit
-.streamlit/
+# Streamlit 配置（追踪 config.toml，但 secrets.toml 已在上方排除）
 
 # Jupyter
 .ipynb_checkpoints/
@@ -43,28 +43,15 @@ Thumbs.db
 htmlcov/
 .coverage
 .coverage.*
-=======
-### AL ###
-#Template for AL projects for Dynamics 365 Business Central
-#launch.json folder
-.vscode/
-#Cache folder
+
+# Dynamics 365 AL
 .alcache/
-#Symbols folder
 .alpackages/
-#Snapshots folder
 .snapshots/
-#Testing Output folder
 .output/
-#Extension App-file
 *.app
-#Rapid Application Development File
 rad.json
-#Translation Base-file
 *.g.xlf
-#License-files
 *.bclicense
 *.flf
-#Test results file
 TestResults.xml
->>>>>>> bd4c19a73bc143458c0ea14209b44382f309dff2

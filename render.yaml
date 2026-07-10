@@ -1,0 +1,33 @@
+services:
+  # ========== FastAPI 后端 ==========
+  - type: web
+    name: morndigest-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: "pip install -r requirements.txt"
+    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      # ===== 部署时需要在 Render Dashboard 填入真实值 =====
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_BASE_URL
+        value: "https://api.anthropic.com"
+      - key: QWEATHER_KEY
+        sync: false
+      - key: QWEATHER_API_HOST
+        value: "mt3aartb6n.re.qweatherapi.com"
+      - key: NEWS_KEY
+        sync: false
+      - key: DEFAULT_CITY
+        value: "北京"
+      - key: DEFAULT_MODEL
+        value: "claude"
+      - key: STORAGE_BACKEND
+        value: "json"
+      - key: APP_LANG
+        value: "zh-CN"
