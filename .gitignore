@@ -27,6 +27,7 @@ ENV/
 # Runtime data
 data/*.db
 data/*.json
+data/*.bak
 
 # OS
 .DS_Store

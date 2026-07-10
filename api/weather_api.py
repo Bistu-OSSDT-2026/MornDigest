@@ -1,14 +1,20 @@
 """
 weather_api.py — 天气数据获取模块
 
-调用和风天气 (QWeather) API 获取实时天气和预报数据，
-解析后返回标准化的 WeatherData 对象。
+调用和风天气 (QWeather) API 获取实时天气和预报数据。
+
+支持专属子账号（sub-host）的路径差异：
+    公共账号路径: /v2/city/lookup
+    专属子账号:   /geo/v2/city/lookup  (前缀多了 /geo/)
+
+通过 QWEATHER_USE_GEO_PREFIX=true 自动启用专属子账号模式。
 
 实现方：芦泓天
 """
 
 import logging
 import requests
+import os
 from datetime import datetime
 from typing import Optional
 
@@ -24,17 +30,53 @@ class WeatherAPIError(Exception):
     pass
 
 
+# 公共域名
+PUBLIC_GEO_HOST = "https://geoapi.qweather.com"
+PUBLIC_DEV_HOST = "https://devapi.qweather.com"
+
+
+def _is_sub_account() -> bool:
+    """是否使用专属子账号模式
+    
+    当设置了 QWEATHER_API_HOST 或 QWEATHER_USE_GEO_PREFIX 时启用
+    """
+    return bool(
+        os.environ.get("QWEATHER_API_HOST") or
+        os.environ.get("QWEATHER_USE_GEO_PREFIX", "").lower() in ("true", "1", "yes")
+    )
+
+
+def _get_geo_host() -> str:
+    """地理编码 Host"""
+    custom = os.environ.get("QWEATHER_GEO_HOST") or os.environ.get("QWEATHER_API_HOST")
+    if custom:
+        return custom.rstrip("/")
+    return PUBLIC_GEO_HOST
+
+
+def _get_dev_host() -> str:
+    """数据接口 Host"""
+    custom = os.environ.get("QWEATHER_DEV_HOST") or os.environ.get("QWEATHER_API_HOST")
+    if custom:
+        return custom.rstrip("/")
+    return PUBLIC_DEV_HOST
+
+
+def _geo_path() -> str:
+    """地理编码接口路径
+    
+    专属子账号需要 /geo 前缀
+    """
+    if _is_sub_account():
+        return "/geo/v2/city/lookup"
+    return "/v2/city/lookup"
+
+
 def fetch_weather(city: str) -> WeatherData:
     """从和风天气 API 获取指定城市天气数据
 
-    步骤：
-        1. 调用地理编码接口获取 location_id
-        2. 调用实时天气接口获取当前天气
-        3. 调用预报接口获取未来 N 日数据
-        4. 解析并组装为标准 WeatherData 对象返回
-
     Args:
-        city: 城市名，如 "北京"
+        city: 城市名
 
     Returns:
         WeatherData: 标准化天气数据对象
@@ -66,65 +108,122 @@ def fetch_weather(city: str) -> WeatherData:
 
 
 def _get_location_id(city: str, api_key: str) -> str:
-    """地理编码：城市名 → location_id
+    """城市名转换location_id"""
 
-    Args:
-        city: 城市名
-        api_key: API Key
+    url = f"{_get_geo_host()}{_geo_path()}"
+    logger.debug("地理编码 URL: %s", url)
 
-    Returns:
-        location_id 字符串
+    params = {
+        "location": city,
+        "key": api_key
+    }
 
-    Raises:
-        WeatherAPIError: 请求失败或无结果
-    """
-    # TODO: 芦泓天 — 实现地理编码请求
-    # 参考文档: https://dev.qweather.com/docs/api/reference/geo-api/
-    # URL: https://geoapi.qweather.com/v2/city/lookup?location={city}&key={api_key}
-    # 返回示例: {"code":"200","location":[{"id":"101010100","name":"北京","adm2":"北京",...}]}
-    # 取 location[0]["id"] 即可
-    raise WeatherAPIError("天气地理编码接口待实现")
+    try:
+        response = requests.get(
+            url,
+            params=params,
+            timeout=API_TIMEOUT
+        )
+
+        if response.status_code != 200:
+            raise WeatherAPIError(
+                f"城市查询失败: HTTP {response.status_code}, body={response.text[:200]}"
+            )
+
+        data = response.json()
+
+        if data.get("code") != "200":
+            raise WeatherAPIError(
+                f"城市查询失败: {data}"
+            )
+
+        return data["location"][0]["id"]
+
+
+    except WeatherAPIError:
+        raise
+    except Exception as e:
+        raise WeatherAPIError(
+            f"城市查询异常: {e}"
+        )
 
 
 def _get_realtime_weather(location_id: str, api_key: str) -> dict:
-    """获取实时天气
 
-    Args:
-        location_id: 城市 location_id
-        api_key: API Key
+    url = f"{_get_dev_host()}/v7/weather/now"
 
-    Returns:
-        解析后的 JSON dict
+    params = {
+        "location": location_id,
+        "key": api_key
+    }
+    try:
 
-    Raises:
-        WeatherAPIError: 请求失败
-    """
-    # TODO: 芦泓天 — 实现实时天气请求
-    # 参考文档: https://dev.qweather.com/docs/api/weather/weather-now/
-    # URL: https://devapi.qweather.com/v7/weather/now?location={id}&key={api_key}
-    # 返回示例: {"code":"200","now":{"temp":"25","icon":"100","text":"晴","feelsLike":"26","humidity":"45","windDir":"东南","windScale":"3",...}}
-    raise WeatherAPIError("实时天气接口待实现")
+        response = requests.get(
+            url,
+            params=params,
+            timeout=API_TIMEOUT
+        )
 
+        if response.status_code != 200:
+            raise WeatherAPIError(
+                f"实时天气获取失败: HTTP {response.status_code}, body={response.text[:200]}"
+            )
+
+        data = response.json()
+
+
+        if data.get("code") != "200":
+            raise WeatherAPIError(
+                f"实时天气获取失败:{data}"
+            )
+
+        return data
+
+    except WeatherAPIError:
+        raise
+    except Exception as e:
+
+        raise WeatherAPIError(
+            f"实时天气请求异常:{e}"
+        )
 
 def _get_forecast(location_id: str, api_key: str) -> list:
-    """获取天气预报
 
-    Args:
-        location_id: 城市 location_id
-        api_key: API Key
+    url = f"{_get_dev_host()}/v7/weather/7d"
 
-    Returns:
-        未来 N 日预报数据列表
+    params = {
+        "location": location_id,
+        "key": api_key
+    }
 
-    Raises:
-        WeatherAPIError: 请求失败
-    """
-    # TODO: 芦泓天 — 实现预报请求
-    # 参考文档: https://dev.qweather.com/docs/api/weather/weather-forecast/
-    # URL: https://devapi.qweather.com/v7/weather/7d?location={id}&key={api_key}
-    # 返回示例: {"code":"200","daily":[{"fxDate":"2026-07-09","tempMax":"28","tempMin":"18","iconDay":"100","textDay":"晴","iconNight":"101","textNight":"多云",...}, ...]}
-    raise WeatherAPIError("天气预报接口待实现")
+    try:
 
+        response = requests.get(
+            url,
+            params=params,
+            timeout=API_TIMEOUT
+        )
+
+        if response.status_code != 200:
+            raise WeatherAPIError(
+                f"天气预报获取失败: HTTP {response.status_code}, body={response.text[:200]}"
+            )
+
+        data = response.json()
+
+        if data.get("code") != "200":
+            raise WeatherAPIError(
+                f"天气预报获取失败:{data}"
+            )
+
+        return data.get("daily", [])
+    except WeatherAPIError:
+        raise
+    except Exception as e:
+
+        raise WeatherAPIError(
+            f"天气预报请求异常:{e}"
+        )
 
 def _build_weather_data(city: str, now_data: dict, forecast_data: list) -> WeatherData:
     """组装标准 WeatherData 对象
@@ -137,23 +236,45 @@ def _build_weather_data(city: str, now_data: dict, forecast_data: list) -> Weath
     Returns:
         WeatherData 对象
     """
-    # TODO: 芦泓天 — 解析 now_data 和 forecast_data 字段
-    # 组装 forecast 文本，如 ["明天: 晴 15-20°", "后天: 多云 13-18°"]
-
     weather = WeatherData()
     weather.city = city
     weather.date = datetime.now().strftime("%Y-%m-%d")
     weather.timestamp = datetime.now()
     weather.source = "qweather"
 
-    # TODO: 填充以下字段 (芦泓天)
-    # weather.temp_now = float(now_data["now"]["temp"])
-    # weather.temp_min = float(forecast_data[0]["tempMin"])
-    # weather.temp_max = float(forecast_data[0]["tempMax"])
-    # weather.condition = now_data["now"]["text"]
-    # weather.humidity = int(now_data["now"]["humidity"])
-    # weather.wind_level = now_data["now"]["windScale"] + "级"
-    # for day in forecast_data[1:4]:
-    #     weather.forecast.append(f"{day['fxDate']}: {day['textDay']} {day['tempMin']}-{day['tempMax']}°")
+    now = now_data["now"]
+
+    weather.temp_now = float(now.get("temp", 0))
+
+    if forecast_data:
+        weather.temp_min = float(
+            forecast_data[0].get("tempMin", 0)
+        )
+
+        weather.temp_max = float(
+            forecast_data[0].get("tempMax", 0)
+        )
+
+    weather.condition = now.get(
+        "text",
+        "未知"
+    )
+
+    weather.humidity = int(
+        now.get("humidity", 0)
+    )
+
+    weather.wind_level = (
+        now.get("windScale", "")
+        + "级"
+    )
+
+    for day in forecast_data[1:4]:
+        weather.forecast.append(
+            f"{day['fxDate']}: "
+            f"{day['textDay']} "
+            f"{day['tempMin']}-"
+            f"{day['tempMax']}°"
+        )
 
     return weather
